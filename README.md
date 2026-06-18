@@ -1,6 +1,6 @@
 # Audioflow to MQTT Gateway
 
-This is the Home Assistant add-on version of [audioflow2mqtt](https://github.com/Tediore/audioflow2mqtt-addon). audioflow2mqtt enables local control of your Audioflow speaker switch(es) via MQTT. It supports Home Assistant MQTT discovery for easy integration.
+This is the Home Assistant **add-on** version of [audioflow2mqtt](https://github.com/henrycarteruk/audioflow2mqtt). It enables local control of your Audioflow speaker switch(es) via MQTT and supports Home Assistant MQTT discovery for easy integration. It can automatically discover the Audioflow devices on your network via UDP discovery, or you can specify their IP addresses if you'd rather not use discovery.
 
 <br>
 
@@ -8,76 +8,103 @@ This is the Home Assistant add-on version of [audioflow2mqtt](https://github.com
 1. Go to the add-on store in Home Assistant.
 2. Click the three dots in the upper right.
 3. Click **Repositories**.
-4. Paste in **https://github.com/Tediore/audioflow2mqtt-addon** and click **ADD**.
-5. Click **CLOSE** and refresh the page; the add-on should now be visible.
+4. Paste in **https://github.com/henrycarteruk/audioflow2mqtt-addon** and click **ADD**.
+5. Click **CLOSE** and refresh the page; the add-on should now be visible. Install and start it.
+
+<br>
+
+# Supported architectures
+The add-on is built locally on installation for the following architectures:
+
+| Architecture | Examples |
+|--------------|----------|
+| `amd64` | Intel/AMD x86-64 (NUC, generic server, most VMs) |
+| `aarch64` | 64-bit ARM (Home Assistant Green & Yellow, Raspberry Pi 3/4/5 on a 64-bit OS) |
+| `armv7` | 32-bit ARMv7 (Raspberry Pi 2/3 on a 32-bit OS) |
+
+`armhf` (ARMv6 — Raspberry Pi 1 and Pi Zero) is **not** supported.
 
 <br>
 
 # Configuration
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| MQTT host | core-mosquitto | IP address or hostname of the MQTT broker to connect to. |
-| MQTT port | 1883 | The port the MQTT broker is bound to. |
-| MQTT username | None | The user to send to the MQTT broker. |
-| MQTT password | None | The password to send to the MQTT broker. |
-| MQTT base topic | audioflow2mqtt | The topic prefix to use for all payloads. |
-| Devices | None | IP address(es) or hostname(s) of your Audioflow device(s). |
-| Log level | info | Minimum log level. |
+The add-on is configured from the **Configuration** tab in Home Assistant.
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `mqtt_host` | _(empty)_ | IP address or hostname of the MQTT broker. **Leave empty** to use the broker provided by the Home Assistant Supervisor. |
+| `mqtt_port` | `1883` | The port the MQTT broker is bound to. Ignored when the Supervisor broker is used. |
+| `mqtt_user` | _(empty)_ | Username for the MQTT broker. |
+| `mqtt_pass` | _(empty)_ | Password for the MQTT broker. |
+| `qos` | `1` | MQTT Quality of Service level (`0`–`2`) for published messages. |
+| `base_topic` | `audioflow2mqtt` | The topic prefix to use for all payloads. |
+| `devices` | _(empty)_ | IP address(es) of your Audioflow device(s). Leave empty to find them automatically via UDP discovery; set them to skip discovery. |
+| `log_level` | `info` | Minimum log level. One of `debug`, `info`, `warning`, `error`. |
+
+When `mqtt_host` is left empty, broker host, port, username and password are taken automatically from the Supervisor's MQTT service. Home Assistant MQTT discovery is always enabled.
 
 <br>
 
 # Home Assistant
-audioflow2mqtt supports Home Assistant MQTT discovery which creates a Device for the Audioflow switch with the following:
+The add-on uses Home Assistant MQTT discovery to create a Device for each Audioflow switch with:
 - Switch entities for each zone
-- Button entities to turn all zones on/off
+- Button entities to turn all zones on and off
 - Sensors for SSID, RSSI (signal strength), and Wi-Fi channel
 
 ![Home Assistant Device screenshot](ha_screenshot.png)
 
 <br>
 
-# MQTT topic structure and examples
-The command topic syntax is `BASE_TOPIC/serial_number/command/zone_number` where `BASE_TOPIC` is the base topic you define, `serial_number` is the device serial number (found on the sticker on the bottom of the device), `command` is one of the below commands, and `zone_number` is the zone you want to control (zone A on the switch is zone number 1, zone B is zone number 2, and so on).
+# MQTT topic structure
 
-Valid commands are `set_zone_state` and `set_zone_enable`. The examples below assume the base topic is the default (`audioflow2mqtt`) and the serial number is `0123456789`.
+All topics are prefixed with your `base_topic` (default `audioflow2mqtt`). The examples below use the default base topic and the serial number `0123456789` (found on the sticker on the bottom of the device). Zones are numbered A = 1, B = 2, and so on.
 
-**Turn zone B (zone number 2) on or off, or toggle between states**
+## Commands you send
 
-Topic: `audioflow2mqtt/0123456789/set_zone_state/2`
+Publish to these topics to control the gateway and devices. Per-zone commands take a trailing zone number; the others don't.
 
-Valid payloads: `on`, `off`, `toggle`
+| Command topic | Payload | Effect |
+|---------------|---------|--------|
+| `audioflow2mqtt/0123456789/set_zone_state/<zone>` | `on`, `off`, `toggle` | Turn one zone on/off, or toggle it |
+| `audioflow2mqtt/0123456789/set_zone_state` | `on`, `off` | Turn **all** zones on/off (no zone number; `toggle` isn't supported here) |
+| `audioflow2mqtt/0123456789/set_zone_enable/<zone>` | `1`, `0` | Enable (`1`) or disable (`0`) one zone |
+| `audioflow2mqtt/discover` | _(any)_ | Trigger a fresh UDP discovery sweep to pick up newly added devices |
 
-**Turn all zones on or off**
+## Topics the gateway publishes
 
-Topic: `audioflow2mqtt/0123456789/set_zone_state` (note the lack of a zone number at the end of the topic)
+**Zone state**, published after any change and on each poll:
 
-Valid payloads: `on`, `off`
+- `audioflow2mqtt/0123456789/zone_state/<zone>`: `on` or `off`
+- `audioflow2mqtt/0123456789/zone_enabled/<zone>`: `1` or `0`
 
-**Enable or disable zone A (zone number 1)**
-_This might not really be something you would need, but I figured I'd add it anyway_
+> The device doesn't report a new state after a command, so the gateway re-reads the affected zone(s) and republishes.
 
-Topic: `audioflow2mqtt/0123456789/set_zone_enable/1`
+**Network info**, polled periodically:
 
-Valid payloads: `1` for enabled, `0` for disabled
+- `audioflow2mqtt/0123456789/network_info/ssid`
+- `audioflow2mqtt/0123456789/network_info/channel`
+- `audioflow2mqtt/0123456789/network_info/rssi`
+
+**Availability**, retained for Home Assistant and monitoring:
+
+- `audioflow2mqtt/status`: `online`/`offline` for the gateway itself; if the gateway disconnects unexpectedly, the broker publishes `offline` on its behalf
+- `audioflow2mqtt/0123456789/status`: `online`/`offline` for an individual device
+
+<br>
+
+# Notes
+A single instance handles multiple Audioflow devices — every topic is namespaced by the device serial number, so they don't collide.
+
+For reliability, give each Audioflow device a static IP (e.g. a DHCP reservation) and set `devices` rather than relying on UDP discovery. UDP discovery only works when the device is on the same subnet as the machine running Home Assistant.
 
 <br>
 
-When the zone state or enabled/disabled status is changed, audioflow2mqtt publishes the result to the following topics:
+# License
 
-**Zone state:** `audioflow2mqtt/0123456789/zone_state/ZONE`
+Licensed under the [GNU GPLv3](LICENSE).
 
-**Zone enabled/disabled:** `audioflow2mqtt/0123456789/zone_enabled/ZONE`
+This is a modified fork of the original [audioflow2mqtt](https://github.com/tediore/audioflow2mqtt) by [tediore](https://github.com/tediore). Original work © [tediore](https://github.com/tediore); modifications © [henrycarteruk](https://github.com/henrycarteruk). As a derivative of a GPLv3 project, it remains under GPLv3.
 
-<br>
+If you find it useful, consider buying the original author a coffee to support their work:
 
-Network info is published to the following topics:
-
-**SSID:** `audioflow2mqtt/0123456789/network_info/ssid`
-
-**Wi-fi channel:** `audioflow2mqtt/0123456789/network_info/channel`
-
-**RSSI:** `audioflow2mqtt/0123456789/network_info/rssi`
-
-<br>
 <a href="https://www.buymeacoffee.com/tediore" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
