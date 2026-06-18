@@ -1,32 +1,35 @@
 name: audioflow2mqtt
 description: Audioflow speaker switch to MQTT gateway
-version: "0.7.0a"
+version: "0.8.0"
 slug: audioflow2mqtt
 init: false
 arch:
 - amd64
 - aarch64
-- armhf
 - armv7
 discovery:
 - mqtt
-url: https://github.com/Tediore/audioflow2mqtt-addon
-image: "tediore/audioflow2mqtt-addon-{arch}"
+services:
+- mqtt:need
+hassio_api: true
+url: https://github.com/henrycarteruk/audioflow2mqtt-addon
 
 options:
-  mqtt_host: core-mosquitto
+  mqtt_host: ""
   mqtt_port: 1883
   mqtt_user: null
   mqtt_pass: null
+  qos: 1
   base_topic: audioflow2mqtt
   devices: null
   log_level: info
 
 schema:
-  mqtt_host: str
-  mqtt_port: int
-  mqtt_user: str
-  mqtt_pass: password
+  mqtt_host: str?
+  mqtt_port: int?
+  mqtt_user: str?
+  mqtt_pass: password?
+  qos: int(0,2)?
   base_topic: str
   devices:
   - str?
