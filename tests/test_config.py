@@ -1,4 +1,44 @@
-from audioflow2mqtt.config import resolve_config, Config
+import asyncio
+import json
+
+import httpx
+
+from audioflow2mqtt.config import resolve_config, Config, load_options, fetch_mqtt_service
+
+
+def test_load_options_reads_json(tmp_path):
+    path = tmp_path / "options.json"
+    path.write_text(json.dumps({"base_topic": "x", "qos": 2}))
+    assert load_options(str(path)) == {"base_topic": "x", "qos": 2}
+
+
+def test_fetch_mqtt_service_returns_data():
+    def handler(request):
+        assert request.url.path == "/services/mqtt"
+        assert request.headers["Authorization"] == "Bearer tok"
+        return httpx.Response(200, json={"result": "ok", "data": {"host": "core-mosquitto", "port": 1883}})
+
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+
+    async def go():
+        try:
+            return await fetch_mqtt_service(http, token="tok")
+        finally:
+            await http.aclose()
+
+    assert asyncio.run(go()) == {"host": "core-mosquitto", "port": 1883}
+
+
+def test_fetch_mqtt_service_returns_none_without_token():
+    http = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(500)))
+
+    async def go():
+        try:
+            return await fetch_mqtt_service(http, token=None)
+        finally:
+            await http.aclose()
+
+    assert asyncio.run(go()) is None
 
 
 def test_defaults_applied_for_omitted_options():
