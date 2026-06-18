@@ -1,9 +1,17 @@
-FROM alpine:3
+ARG BUILD_FROM=python:3.12-slim
+FROM ${BUILD_FROM}
 
-ADD audioflow2mqtt.py /
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PROJECT_ENVIRONMENT=/app/.venv \
+    PATH="/app/.venv/bin:$PATH"
 
-RUN apk add --no-cache python3
-RUN python3 -m ensurepip
-RUN pip3 install setuptools paho.mqtt requests pyyaml
+WORKDIR /app
+RUN pip install --no-cache-dir uv
 
-CMD [ "python3", "./audioflow2mqtt.py" ]
+# Install dependencies from the lockfile (project itself is package=false).
+COPY pyproject.toml uv.lock ./
+COPY audioflow2mqtt ./audioflow2mqtt
+RUN uv sync --frozen --no-dev
+
+CMD ["python", "-m", "audioflow2mqtt"]
