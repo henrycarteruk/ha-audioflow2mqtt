@@ -6,7 +6,10 @@ Supervisor service is done elsewhere and passed in.
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+
+import httpx
 
 
 @dataclass(frozen=True)
@@ -20,6 +23,27 @@ class Config:
     devices: list[str] | None
     log_level: str
     home_assistant: bool = True
+
+
+def load_options(path: str = "/data/options.json") -> dict:
+    """Read the add-on options file written by the Supervisor."""
+    with open(path) as file:
+        return json.load(file)
+
+
+async def fetch_mqtt_service(http: httpx.AsyncClient, token: str | None) -> dict | None:
+    """Fetch MQTT broker config from the Supervisor services API, or None."""
+    if not token:
+        return None
+    try:
+        resp = await http.get(
+            "http://supervisor/services/mqtt",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        resp.raise_for_status()
+    except httpx.HTTPError:
+        return None
+    return resp.json().get("data")
 
 
 def _pick(*candidates):
