@@ -18,11 +18,11 @@ url: https://github.com/henrycarteruk/audioflow2mqtt-addon
 options:
   mqtt_host: ""
   mqtt_port: 1883
-  mqtt_user: null
-  mqtt_pass: null
+  mqtt_user: ""
+  mqtt_pass: ""
   qos: 1
   base_topic: audioflow2mqtt
-  devices: null
+  devices: []
   log_level: info
 
 schema:
