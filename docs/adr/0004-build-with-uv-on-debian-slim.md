@@ -19,3 +19,8 @@ without it a maintainer would likely "fix" it by reverting to pip or Alpine.
 - `armhf` (ARMv6) is not supported, because uv has no binary for that architecture.
 - Dependency changes must regenerate `uv.lock` (`make lock`); the image build installs
   from the lockfile, not from loose version ranges.
+- The base image is pinned directly with `FROM python:3.12-slim` in the Dockerfile, not
+  via `build.yaml`/`BUILD_FROM`. The current Home Assistant builder ignores `build.yaml`
+  and otherwise injects its Alpine base (no pip/python) through the `BUILD_FROM` arg,
+  which broke the build. `python:3.12-slim` is a multi-arch manifest, so each host still
+  builds its own architecture.

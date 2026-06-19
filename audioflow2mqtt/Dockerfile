@@ -1,5 +1,8 @@
-ARG BUILD_FROM=python:3.12-slim
-FROM ${BUILD_FROM}
+# Base pinned directly: the Home Assistant builder no longer reads build.yaml's
+# build_from, and otherwise injects its Alpine base (which has no pip/python) via
+# the BUILD_FROM arg. python:3.12-slim is a multi-arch manifest, so each host
+# builds its own architecture.
+FROM python:3.12-slim
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
