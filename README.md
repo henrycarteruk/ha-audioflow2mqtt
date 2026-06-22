@@ -10,7 +10,7 @@ This is the Home Assistant **add-on** version of [Audioflow2MQTT](https://github
 3. Click the **Install App** button in the bottom-right.
 4. Click the three dots menu in the top-right corner and select **Repositories**.
 5. Click the **+ App** button in the bottom-right.
-6. Paste **https://github.com/henrycarteruk/audioflow2mqtt-addon** into the text field.
+6. Paste **https://github.com/henrycarteruk/ha-audioflow2mqtt** into the text field.
 7. Click **Add** and close the pop-up. Refresh the page; the add-on should now be visible.
 8. Install the add-on. The first install builds the image locally on your Home Assistant host, which can take a few minutes (longer on a Raspberry Pi). Then configure and start it.
 

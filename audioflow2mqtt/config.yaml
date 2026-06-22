@@ -16,7 +16,7 @@ services:
   - mqtt:need
 hassio_api: true
 host_network: true
-url: https://github.com/henrycarteruk/audioflow2mqtt-addon
+url: https://github.com/henrycarteruk/ha-audioflow2mqtt
 
 options:
   mqtt_host: ""
