@@ -29,6 +29,11 @@ class SetZoneEnable:
 
 
 @dataclass(frozen=True)
+class Reboot:
+    serial: str
+
+
+@dataclass(frozen=True)
 class Discover:
     pass
 
@@ -59,6 +64,8 @@ def parse_command(base_topic: str, topic: str, payload: str):
         if zone is None or enabled not in (0, 1):
             return None
         return SetZoneEnable(serial=serial, zone=zone, enabled=enabled)
+    if parts[2] == "reboot":
+        return Reboot(serial=serial)
     return None
 
 

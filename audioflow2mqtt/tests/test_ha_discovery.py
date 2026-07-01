@@ -70,6 +70,15 @@ def test_all_messages_share_availability_and_device():
         assert payload["platform"] == "mqtt"
 
 
+def test_reboot_button():
+    msgs = build_device_discovery("audioflow2mqtt", INFO, ZONES)
+    rb = _payload(_by_topic(msgs, "homeassistant/button/0123456789/reboot/config"))
+    assert rb["command_topic"] == "audioflow2mqtt/0123456789/reboot"
+    assert rb["payload_press"] == "reboot"
+    assert rb["unique_id"] == "0123456789_reboot"
+    assert rb["icon"] == "mdi:restart"
+
+
 def test_switch_message_per_zone():
     msgs = build_device_discovery("audioflow2mqtt", INFO, ZONES)
     sw = _payload(_by_topic(msgs, "homeassistant/switch/0123456789/1/config"))

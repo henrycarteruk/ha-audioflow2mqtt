@@ -58,6 +58,18 @@ def build_device_discovery(base_topic: str, info: DeviceInfo, zones: list[Zone])
             },
         ))
 
+    messages.append(_config(
+        f"homeassistant/button/{info.serial}/reboot/config",
+        {
+            **common,
+            "name": "Reboot",
+            "command_topic": f"{base_topic}/{info.serial}/reboot",
+            "payload_press": "reboot",
+            "unique_id": f"{info.serial}_reboot",
+            "icon": "mdi:restart",
+        },
+    ))
+
     for key, name, icon in _SENSORS:
         messages.append(_config(
             f"homeassistant/sensor/{info.serial}/{key}/config",

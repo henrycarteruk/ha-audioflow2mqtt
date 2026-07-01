@@ -74,3 +74,8 @@ class AudioflowClient:
     async def set_zone_enable(self, zone: int, enabled: bool, name: str) -> None:
         # The device requires the existing zone name echoed back in the payload.
         await self._put(f"zonename/{zone}", f"{1 if enabled else 0}{name}")
+
+    async def reboot(self) -> None:
+        # Response body is not JSON; raise_for_status is enough.
+        resp = await self._http.get(self._base + "reboot_now")
+        resp.raise_for_status()

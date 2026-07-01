@@ -80,6 +80,13 @@ def test_set_zone_enable_echoes_name():
     assert disabled["body"] == "0Kitchen"
 
 
+def test_reboot_calls_reboot_now():
+    seen = {}
+    _run_with(_capture(seen), lambda c: c.reboot())
+    assert seen["method"] == "GET"
+    assert seen["path"] == "/reboot_now"
+
+
 def test_non_2xx_response_raises():
     def handler(request):
         return httpx.Response(500)

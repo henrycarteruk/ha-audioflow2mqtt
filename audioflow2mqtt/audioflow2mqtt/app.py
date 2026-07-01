@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 
 import httpx
 
-from .commands import parse_command, Discover
+from .commands import parse_command, Discover, Reboot
 from .config import Config
 from .device import AudioflowClient, DeviceInfo, Zone
 from .dispatch import (
@@ -92,6 +92,9 @@ class Orchestrator:
             return
         if isinstance(action, Discover):
             await self.rediscover()
+            return
+        if isinstance(action, Reboot):
+            await device.client.reboot()
             return
         await self.execute(action)
         await self.refresh_state(action.serial)

@@ -3,6 +3,7 @@ from audioflow2mqtt.commands import (
     SetZoneState,
     SetAllZones,
     SetZoneEnable,
+    Reboot,
     Discover,
 )
 
@@ -79,3 +80,8 @@ def test_set_zone_state_without_zone_targets_all_zones():
         "audioflow2mqtt", "audioflow2mqtt/0123456789/set_zone_state", "off"
     )
     assert cmd == SetAllZones(serial="0123456789", value="off")
+
+
+def test_reboot_topic_parses_to_reboot():
+    cmd = parse_command("audioflow2mqtt", "audioflow2mqtt/0123456789/reboot", "")
+    assert cmd == Reboot(serial="0123456789")

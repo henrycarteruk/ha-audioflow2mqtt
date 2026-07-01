@@ -275,6 +275,28 @@ def test_discover_command_acquires_new_device():
     assert ("af/S2/status", "online") in published
 
 
+def test_handle_message_reboot_calls_device_and_skips_state_poll():
+    gets = []
+
+    def handler(request):
+        gets.append(request.url.path)
+        return httpx.Response(200, text="rebooting")
+
+    device, http = make_device(handler, [Zone(1, "K", "off", True)])
+    transport = FakeTransport()
+    orch = Orchestrator(CONFIG, transport, {"S": device})
+
+    async def go():
+        try:
+            await orch.handle_message("af/S/reboot", "")
+        finally:
+            await http.aclose()
+
+    asyncio.run(go())
+    assert "/reboot_now" in gets
+    assert transport.published == []  # no state republish after reboot
+
+
 def test_execute_apply_zone_state_calls_device():
     puts = []
 

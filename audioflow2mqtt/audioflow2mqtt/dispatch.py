@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .commands import SetZoneState, SetAllZones, SetZoneEnable, Discover
+from .commands import SetZoneState, SetAllZones, SetZoneEnable, Reboot, Discover
 from .device import Zone
 
 
@@ -38,6 +38,8 @@ class ApplyZoneEnable:
 def plan_action(command, zones: list[Zone] | None):
     if isinstance(command, Discover):
         return command
+    if isinstance(command, Reboot):
+        return command if zones is not None else None
     if isinstance(command, SetZoneState):
         zone = _find(zones, command.zone)
         if zone is None or not zone.enabled:

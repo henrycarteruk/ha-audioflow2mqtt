@@ -1,4 +1,4 @@
-from audioflow2mqtt.commands import SetZoneState, SetAllZones, SetZoneEnable, Discover
+from audioflow2mqtt.commands import SetZoneState, SetAllZones, SetZoneEnable, Reboot, Discover
 from audioflow2mqtt.device import Zone
 from audioflow2mqtt.dispatch import (
     plan_action,
@@ -47,6 +47,14 @@ def test_set_zone_enable_echoes_current_name():
 
 def test_discover_returns_discover():
     assert plan_action(Discover(), None) == Discover()
+
+
+def test_reboot_returns_command_when_device_known():
+    assert plan_action(Reboot("S"), ZONES) == Reboot("S")
+
+
+def test_reboot_returns_none_when_device_unknown():
+    assert plan_action(Reboot("S"), None) is None
 
 
 def test_explicit_on_plans_apply_zone_state():
