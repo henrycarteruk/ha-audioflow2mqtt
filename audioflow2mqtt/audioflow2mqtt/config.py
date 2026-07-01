@@ -55,21 +55,6 @@ def resolve_config(options: dict, mqtt_service: dict | None = None) -> Config:
         mqtt_pass=pick(options.get("mqtt_pass"), service.get("password")),
         qos=options.get("qos") if options.get("qos") is not None else 1,
         base_topic=options.get("base_topic") or "audioflow2mqtt",
-        devices=_clean_devices(options.get("devices")),
-        log_level=_clean_log_level(options.get("log_level")),
+        devices=[d for d in (options.get("devices") or []) if d not in (None, "")] or None,
+        log_level=_lv if (_lv := str(options.get("log_level") or "").lower()) in ("debug", "info", "warning", "error") else "info",
     )
-
-
-_VALID_LOG_LEVELS = ("debug", "info", "warning", "error")
-
-
-def _clean_log_level(level) -> str:
-    normalized = str(level or "").lower()
-    return normalized if normalized in _VALID_LOG_LEVELS else "info"
-
-
-def _clean_devices(devices) -> list[str] | None:
-    if not devices:
-        return None
-    cleaned = [d for d in devices if d not in (None, "")]
-    return cleaned or None

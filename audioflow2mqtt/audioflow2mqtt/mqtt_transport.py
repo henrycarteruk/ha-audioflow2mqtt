@@ -11,7 +11,7 @@ import asyncio
 import aiomqtt
 
 from .config import Config
-from .mqtt import gateway_will
+from .mqtt import gateway_status_message
 
 
 class MqttTransport:
@@ -22,7 +22,7 @@ class MqttTransport:
         self._stop = False
 
     async def connect(self) -> None:
-        will = gateway_will(self._config.base_topic)
+        will = gateway_status_message(self._config.base_topic, online=False)
         client = self._factory(
             hostname=self._config.mqtt_host,
             port=self._config.mqtt_port,

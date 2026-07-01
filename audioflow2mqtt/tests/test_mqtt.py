@@ -7,7 +7,6 @@ from audioflow2mqtt.mqtt import (
     device_status_message,
     gateway_status_message,
     subscribe_topics,
-    gateway_will,
 )
 
 
@@ -32,12 +31,6 @@ def test_gateway_status_message():
     )
     assert gateway_status_message("audioflow2mqtt", False).payload == "offline"
 
-
-def test_gateway_will_is_offline_status():
-    # LWT the broker publishes if the gateway drops; mirrors gateway offline status.
-    assert gateway_will("audioflow2mqtt") == PublishMessage(
-        "audioflow2mqtt/status", "offline", qos=1, retain=True
-    )
 
 
 def test_subscribe_topics():

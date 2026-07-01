@@ -52,6 +52,3 @@ def subscribe_topics(base_topic: str, serials: list[str]) -> list[str]:
     return [f"{base_topic}/{serial}/#" for serial in serials] + [f"{base_topic}/discover"]
 
 
-def gateway_will(base_topic: str) -> PublishMessage:
-    """Last-will: published by the broker if the gateway drops off."""
-    return gateway_status_message(base_topic, online=False)

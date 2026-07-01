@@ -85,7 +85,9 @@ class Orchestrator:
         command = parse_command(self._config.base_topic, topic, payload)
         if command is None:
             return
-        action = plan_action(command, self._zones_for(command))
+        serial = getattr(command, "serial", None)
+        device = self._devices.get(serial) if serial else None
+        action = plan_action(command, device.zones if device else None)
         if action is None:
             return
         if isinstance(action, Discover):
@@ -93,11 +95,6 @@ class Orchestrator:
             return
         await self.execute(action)
         await self.refresh_state(action.serial)
-
-    def _zones_for(self, command):
-        serial = getattr(command, "serial", None)
-        device = self._devices.get(serial) if serial else None
-        return device.zones if device else None
 
     async def execute(self, action) -> None:
         device = self._devices[action.serial]
