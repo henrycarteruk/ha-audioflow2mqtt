@@ -13,12 +13,7 @@ import httpx
 from .commands import parse_command, Discover, Reboot
 from .config import Config
 from .device import AudioflowClient, DeviceInfo, Zone
-from .dispatch import (
-    plan_action,
-    ApplyZoneState,
-    ApplyAllZones,
-    ApplyZoneEnable,
-)
+from .dispatch import plan_action, ApplyZoneState, ApplyAllZones, ApplyZoneEnable
 from .ha_discovery import build_device_discovery
 from .health import DeviceHealth
 from .mqtt import (
@@ -85,16 +80,17 @@ class Orchestrator:
         command = parse_command(self._config.base_topic, topic, payload)
         if command is None:
             return
-        serial = getattr(command, "serial", None)
-        device = self._devices.get(serial) if serial else None
-        action = plan_action(command, device.zones if device else None)
-        if action is None:
-            return
-        if isinstance(action, Discover):
+        if isinstance(command, Discover):
             await self.rediscover()
             return
-        if isinstance(action, Reboot):
-            await device.client.reboot()
+        serial = command.serial
+        device = self._devices.get(serial)
+        if isinstance(command, Reboot):
+            if device is not None:
+                await device.client.reboot()
+            return
+        action = plan_action(command, device.zones if device else None)
+        if action is None:
             return
         await self.execute(action)
         await self.refresh_state(action.serial)

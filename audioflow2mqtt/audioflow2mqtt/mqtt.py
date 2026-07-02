@@ -21,14 +21,15 @@ class PublishMessage:
 
 
 def zone_messages(base_topic: str, serial: str, zones: list[Zone], qos: int) -> list[PublishMessage]:
-    messages: list[PublishMessage] = []
-    for zone in zones:
-        prefix = f"{base_topic}/{serial}"
-        messages.append(PublishMessage(f"{prefix}/zone_state/{zone.number}", zone.state, qos=qos))
-        messages.append(PublishMessage(
-            f"{prefix}/zone_enabled/{zone.number}", "1" if zone.enabled else "0", qos=qos
-        ))
-    return messages
+    prefix = f"{base_topic}/{serial}"
+    return [
+        msg
+        for zone in zones
+        for msg in (
+            PublishMessage(f"{prefix}/zone_state/{zone.number}", zone.state, qos=qos),
+            PublishMessage(f"{prefix}/zone_enabled/{zone.number}", "1" if zone.enabled else "0", qos=qos),
+        )
+    ]
 
 
 def network_messages(base_topic: str, serial: str, wifi: WifiInfo, qos: int) -> list[PublishMessage]:

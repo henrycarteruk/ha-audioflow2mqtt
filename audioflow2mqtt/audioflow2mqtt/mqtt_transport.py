@@ -33,6 +33,8 @@ class MqttTransport:
                 topic=will.topic, payload=will.payload, qos=will.qos, retain=will.retain
             ),
         )
+        # Direct __aenter__ call is intentional: connect/disconnect are separate lifecycle
+        # methods so run_forever can reconnect in a loop without one contiguous async with block.
         await client.__aenter__()
         self._client = client
 

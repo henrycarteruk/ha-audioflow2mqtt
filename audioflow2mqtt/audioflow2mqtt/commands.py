@@ -33,7 +33,6 @@ class Reboot:
     serial: str
 
 
-@dataclass(frozen=True)
 class Discover:
     pass
 

@@ -56,7 +56,7 @@ def test_unknown_command_is_ignored():
 
 def test_gateway_discover_topic():
     cmd = parse_command("audioflow2mqtt", "audioflow2mqtt/discover", "")
-    assert cmd == Discover()
+    assert isinstance(cmd, Discover)
 
 
 def test_set_zone_enable():
