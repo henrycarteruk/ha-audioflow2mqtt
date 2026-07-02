@@ -51,7 +51,7 @@ When `mqtt_host` is left empty, broker host, port, username and password are tak
 # Home Assistant
 The add-on uses Home Assistant MQTT discovery to create a Device for each Audioflow switch with:
 - Switch entities for each zone
-- Button entities to turn all zones on and off
+- Button entities to turn all zones on, turn all zones off, and reboot the device
 - Sensors for SSID, RSSI (signal strength), and Wi-Fi channel
 
 ![Home Assistant Device screenshot](ha_screenshot.png)
@@ -71,6 +71,7 @@ Publish to these topics to control the gateway and devices. Per-zone commands ta
 | `audioflow2mqtt/0123456789/set_zone_state/<zone>` | `on`, `off`, `toggle` | Turn one zone on/off, or toggle it |
 | `audioflow2mqtt/0123456789/set_zone_state` | `on`, `off` | Turn **all** zones on/off (no zone number; `toggle` isn't supported here) |
 | `audioflow2mqtt/0123456789/set_zone_enable/<zone>` | `1`, `0` | Enable (`1`) or disable (`0`) one zone |
+| `audioflow2mqtt/0123456789/reboot` | `reboot` | Reboot the device |
 | `audioflow2mqtt/discover` | _(any)_ | Trigger a fresh UDP discovery sweep to pick up newly added devices |
 
 ## Topics the gateway publishes
@@ -99,6 +100,8 @@ Publish to these topics to control the gateway and devices. Per-zone commands ta
 A single instance handles multiple Audioflow devices — every topic is namespaced by the device serial number, so they don't collide.
 
 For reliability, give each Audioflow device a static IP (e.g. a DHCP reservation) and set `devices` rather than relying on UDP discovery. UDP discovery only works when the device is on the same subnet as the machine running Home Assistant.
+
+The add-on exposes a health endpoint on port 8099. The Supervisor monitors it and automatically restarts the add-on if MQTT connectivity is lost.
 
 <br>
 

@@ -6,7 +6,6 @@ Supervisor service is done elsewhere and passed in.
 """
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 
 import httpx
@@ -22,12 +21,6 @@ class Config:
     base_topic: str
     devices: list[str] | None
     log_level: str
-
-
-def load_options(path: str = "/data/options.json") -> dict:
-    """Read the add-on options file written by the Supervisor."""
-    with open(path) as file:
-        return json.load(file)
 
 
 async def fetch_mqtt_service(http: httpx.AsyncClient, token: str | None) -> dict | None:

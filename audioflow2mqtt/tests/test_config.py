@@ -1,15 +1,8 @@
 import asyncio
-import json
 
 import httpx
 
-from audioflow2mqtt.config import resolve_config, Config, load_options, fetch_mqtt_service
-
-
-def test_load_options_reads_json(tmp_path):
-    path = tmp_path / "options.json"
-    path.write_text(json.dumps({"base_topic": "x", "qos": 2}))
-    assert load_options(str(path)) == {"base_topic": "x", "qos": 2}
+from audioflow2mqtt.config import resolve_config, Config, fetch_mqtt_service
 
 
 def test_fetch_mqtt_service_returns_data():

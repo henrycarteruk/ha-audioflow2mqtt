@@ -6,6 +6,7 @@ unit-tested modules (config, dispatch, app, mqtt, mqtt_transport, ...).
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import signal
@@ -14,7 +15,7 @@ import sys
 import httpx
 
 from .app import Device, Orchestrator
-from .config import fetch_mqtt_service, load_options, resolve_config
+from .config import fetch_mqtt_service, resolve_config
 from .discovery import discover_devices
 from .mqtt_transport import MqttTransport
 
@@ -43,7 +44,8 @@ async def _poll(devices, interval: int, refresh) -> None:
 
 
 async def run() -> None:
-    options = load_options()
+    with open("/data/options.json") as f:
+        options = json.load(f)
     config = resolve_config(options, None)
     logging.basicConfig(
         level=config.log_level.upper(), format="%(asctime)s %(levelname)s: %(message)s"
