@@ -29,11 +29,14 @@ async def _health_server(transport: MqttTransport, devices: dict) -> None:
     async def handle(reader, writer):
         raw = await reader.read(1024)
         path = raw.split(b" ")[1].split(b"?")[0] if b" " in raw else b"/"
+        peer = writer.get_extra_info("peername")[0]
         if path == b"/health":
             ok = transport.connected
             writer.write(b"HTTP/1.1 " + (b"200 OK" if ok else b"503 Service Unavailable") + b"\r\nContent-Type: text/plain\r\n\r\n" + (b"OK" if ok else b"Service Unavailable"))
-        else:
+        elif peer == "172.30.32.2":
             writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + _status_page(transport.connected, devices))
+        else:
+            writer.write(b"HTTP/1.1 403 Forbidden\r\n\r\n")
         await writer.drain()
         writer.close()
     server = await asyncio.start_server(handle, "0.0.0.0", HEALTH_PORT)
