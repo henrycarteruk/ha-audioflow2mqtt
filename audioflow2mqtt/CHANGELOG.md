@@ -5,6 +5,26 @@ All notable changes to this add-on are documented here. The format is based on
 [Semantic Versioning](https://semver.org/) — the `version` in `config.yaml` is the
 release version Home Assistant uses to offer updates.
 
+## 0.8.5
+
+### Changed
+
+- Internal refactoring with no behaviour change.
+- README updated to document the reboot button and Supervisor watchdog introduced in 0.8.4.
+
+## 0.8.4
+
+### Added
+
+- Reboot button entity in Home Assistant. Publishing `reboot` to
+  `<base_topic>/<serial>/reboot` reboots the device. No state poll follows — the
+  device goes offline and recovers on its own.
+- Health endpoint on port 8099. Returns `200` when the MQTT transport is connected,
+  `503` otherwise. The Supervisor monitors it and automatically restarts the add-on
+  if connectivity is lost.
+- Automated GitHub release pipeline: a release and changelog are published
+  automatically when a version bump is merged to `master`.
+
 ## 0.8.3
 
 ### Changed

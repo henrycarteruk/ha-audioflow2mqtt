@@ -1,6 +1,6 @@
 name: Audioflow Speaker Selector
 description: Local control of Audioflow speaker switches over MQTT, with Home Assistant discovery.
-version: "0.8.4"
+version: "0.8.5"
 slug: audioflow2mqtt
 init: false
 startup: application
