@@ -25,15 +25,63 @@ DISCOVERY_RETRY_SECONDS = 60
 HEALTH_PORT = 8099
 
 
-async def _health_server(transport: MqttTransport) -> None:
+async def _health_server(transport: MqttTransport, devices: dict) -> None:
     async def handle(reader, writer):
-        await reader.read(1024)
-        writer.write(b"HTTP/1.1 200 OK\r\n\r\n" if transport.connected else b"HTTP/1.1 503 Service Unavailable\r\n\r\n")
+        raw = await reader.read(1024)
+        path = raw.split(b" ")[1].split(b"?")[0] if b" " in raw else b"/"
+        peer = writer.get_extra_info("peername")[0]
+        if path == b"/health":
+            ok = transport.connected
+            writer.write(b"HTTP/1.1 " + (b"200 OK" if ok else b"503 Service Unavailable") + b"\r\nContent-Type: text/plain\r\n\r\n" + (b"OK" if ok else b"Service Unavailable"))
+        elif peer == "172.30.32.2":
+            writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + _status_page(transport.connected, devices))
+        else:
+            writer.write(b"HTTP/1.1 403 Forbidden\r\n\r\n")
         await writer.drain()
         writer.close()
     server = await asyncio.start_server(handle, "0.0.0.0", HEALTH_PORT)
     async with server:
         await server.serve_forever()
+
+
+def _status_page(connected: bool, devices: dict) -> bytes:
+    rows = []
+    for device in devices.values():
+        rows.append(
+            f"<tr><td colspan='3'><strong>{device.info.name}</strong> "
+            f"<small>{device.info.model} · {device.info.serial}</small> "
+            f"<span style='color:{'#2ecc71' if device.health.online else '#e74c3c'}'>{'online' if device.health.online else 'offline'}</span></td></tr>"
+        )
+        for zone in device.zones:
+            rows.append(
+                f"<tr><td style='padding-left:1.5rem'>Zone {zone.number}</td>"
+                f"<td>{zone.name}{'' if zone.enabled else ' <small>(disabled)</small>'}</td>"
+                f"<td style='color:{'#2ecc71' if zone.state == 'on' else '#aaa'}'>{zone.state}</td></tr>"
+            )
+    table = (
+        "<table><thead><tr><th>Zone</th><th>Name</th><th>State</th></tr></thead><tbody>"
+        + "".join(rows)
+        + "</tbody></table>"
+        if rows else "<p>No devices discovered yet.</p>"
+    )
+    html = f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Audioflow2MQTT</title>
+<style>
+  body{{font-family:sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem;color:#333}}
+  h1{{font-size:1.4rem;margin-bottom:.25rem}}
+  .badge{{display:inline-block;padding:.2rem .6rem;border-radius:.25rem;color:#fff;font-size:.85rem}}
+  table{{width:100%;border-collapse:collapse;margin-top:1.5rem}}
+  th{{text-align:left;border-bottom:2px solid #ddd;padding:.4rem .5rem}}
+  td{{padding:.35rem .5rem;border-bottom:1px solid #eee}}
+</style>
+</head><body>
+<h1>Audioflow2MQTT</h1>
+<span class="badge" style="background:{'#2ecc71' if connected else '#e74c3c'}">MQTT {'Connected' if connected else 'Disconnected'}</span>
+{table}
+</body></html>"""
+    return html.encode()
 
 
 async def _poll(devices, interval: int, refresh) -> None:
@@ -92,7 +140,7 @@ async def run() -> None:
             asyncio.create_task(_poll(devices, POLL_STATE_SECONDS, orchestrator.refresh_state)),
             asyncio.create_task(_poll(devices, POLL_NETWORK_SECONDS, orchestrator.refresh_network)),
             asyncio.create_task(_retry()),
-            asyncio.create_task(_health_server(transport)),
+            asyncio.create_task(_health_server(transport, devices)),
         ]
         try:
             await transport.run_forever(orchestrator.handle_message, on_connect=on_connect)

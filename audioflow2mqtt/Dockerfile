@@ -19,6 +19,6 @@ RUN uv sync --frozen --no-dev
 
 # python:3.12-slim has no curl/wget; use stdlib urllib instead.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8099/')"
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8099/health')"
 
 CMD ["python", "-m", "audioflow2mqtt"]
