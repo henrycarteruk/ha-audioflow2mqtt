@@ -5,6 +5,20 @@ All notable changes to this add-on are documented here. The format is based on
 [Semantic Versioning](https://semver.org/) — the `version` in `config.yaml` is the
 release version Home Assistant uses to offer updates.
 
+## 0.9.0
+
+### Added
+
+- Ingress status page, accessible from the Home Assistant sidebar. Shows MQTT
+  connection state and each discovered device's name, model, serial number,
+  online/offline status, and per-zone state.
+
+### Security
+
+- The status page only accepts connections from the Home Assistant ingress
+  proxy (`172.30.32.2`); all other requests receive `403 Forbidden`. The
+  watchdog health check is unaffected.
+
 ## 0.8.5
 
 ### Changed
