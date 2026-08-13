@@ -4,7 +4,7 @@
 PROJECT_DIR := audioflow2mqtt
 UV := uv --directory $(PROJECT_DIR)
 
-.PHONY: help install test run lock bump clean
+.PHONY: help install test run lock bump clean fake-device
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -18,6 +18,9 @@ test: ## Run the test suite
 
 run: ## Run the add-on locally (python -m audioflow2mqtt)
 	$(UV) run python -m audioflow2mqtt
+
+fake-device: ## Run a fake Audioflow device for local testing (ARGS="--port 8000 ...")
+	$(UV) run python tools/fake_device.py $(ARGS)
 
 lock: ## Update the dependency lockfile
 	$(UV) lock --system-certs
