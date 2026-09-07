@@ -36,6 +36,11 @@ _PHOTOS_DIR = Path(__file__).parent / "photos"
 _PHOTO_BYTES = {name: (_PHOTOS_DIR / name).read_bytes() for name in set(MODEL_PHOTOS.values())}
 
 
+def _respond(writer, status: str, body: bytes = b"", content_type: str = None, extra_headers: str = "") -> None:
+    headers = (f"Content-Type: {content_type}\r\n" if content_type else "") + extra_headers
+    writer.write(f"HTTP/1.1 {status}\r\n{headers}\r\n".encode() + body)
+
+
 async def _health_server(transport: MqttTransport, devices: dict, execute, refresh_state) -> None:
     async def handle(reader, writer):
         method, _, request = (await reader.readline()).decode().partition(" ")
@@ -49,15 +54,16 @@ async def _health_server(transport: MqttTransport, devices: dict, execute, refre
 
         if path == "/health":
             ok = transport.connected
-            writer.write(b"HTTP/1.1 " + (b"200 OK" if ok else b"503 Service Unavailable") + b"\r\nContent-Type: text/plain\r\n\r\n" + (b"OK" if ok else b"Service Unavailable"))
+            _respond(writer, "200 OK" if ok else "503 Service Unavailable",
+                     b"OK" if ok else b"Service Unavailable", "text/plain")
         elif peer != "172.30.32.2":
-            writer.write(b"HTTP/1.1 403 Forbidden\r\n\r\n")
+            _respond(writer, "403 Forbidden")
         elif path.startswith("/photos/"):
             photo = _PHOTO_BYTES.get(path.removeprefix("/photos/"))
             if photo is None:
-                writer.write(b"HTTP/1.1 404 Not Found\r\n\r\n")
+                _respond(writer, "404 Not Found")
             else:
-                writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nCache-Control: max-age=86400\r\n\r\n" + photo)
+                _respond(writer, "200 OK", photo, "image/png", "Cache-Control: max-age=86400\r\n")
         elif method == "POST" and path == "/toggle":
             await _handle_toggle(body.decode(), devices, execute, refresh_state)
             # Relative redirect: Home Assistant's ingress proxy forwards requests to
@@ -65,9 +71,9 @@ async def _health_server(transport: MqttTransport, devices: dict, execute, refre
             # absolute "/" would send the browser to HA's own root instead of back
             # through the proxy. "./" resolves against the request URL and stays
             # under the ingress prefix.
-            writer.write(b"HTTP/1.1 303 See Other\r\nLocation: ./\r\n\r\n")
+            _respond(writer, "303 See Other", extra_headers="Location: ./\r\n")
         else:
-            writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + _status_page(transport.connected, devices))
+            _respond(writer, "200 OK", _status_page(transport.connected, devices), "text/html")
         await writer.drain()
         writer.close()
     server = await asyncio.start_server(handle, "0.0.0.0", HEALTH_PORT)
@@ -152,11 +158,10 @@ def _device_card(device) -> str:
 
 
 def _zone_row(serial: str, zone) -> str:
-    disabled_note = "" if zone.enabled else " <small>(disabled)</small>"
     return (
         "<div class='zone'>"
         f"<span class='dot {'on' if zone.state == 'on' else ''}'></span>"
-        f"<span class='zone-name'>{zone.name}{disabled_note}</span>"
+        f"<span class='zone-name'>{zone.name}{'' if zone.enabled else ' <small>(disabled)</small>'}</span>"
         f"<form method='post' action='toggle'>"
         f"<input type='hidden' name='serial' value='{serial}'>"
         f"<input type='hidden' name='zone' value='{zone.number}'>"
