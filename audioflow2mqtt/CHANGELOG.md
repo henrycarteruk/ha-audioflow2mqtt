@@ -5,6 +5,18 @@ All notable changes to this add-on are documented here. The format is based on
 [Semantic Versioning](https://semver.org/) — the `version` in `config.yaml` is the
 release version Home Assistant uses to offer updates.
 
+## 0.10.0
+
+### Added
+
+- Zone toggle switches directly on the ingress status page. Each zone shows a
+  toggle that flips its state through the same command path MQTT clients use;
+  disabled zones show a disabled toggle.
+- The status page is redesigned as per-device cards, each showing a product
+  photo matching the device's zone count, a status dot per zone, dark mode
+  support, and an auto-refreshing view so changes made elsewhere (Home
+  Assistant, MQTT, another browser tab) appear without a manual reload.
+
 ## 0.9.0
 
 ### Added
