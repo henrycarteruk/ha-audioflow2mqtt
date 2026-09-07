@@ -26,6 +26,15 @@ POLL_NETWORK_SECONDS = 60
 DISCOVERY_RETRY_SECONDS = 60
 HEALTH_PORT = 8099
 
+# Product photos keyed by zone count, for the status page — Audioflow's device
+# lineup differs by zone count (2Z/3Z/4Z), not by the model string the device
+# itself reports (whose exact format isn't documented).
+MODEL_PHOTOS = {
+    2: "https://flow.audio/cdn/shop/files/3S-2ZFrontStraightAudioflow.jpg?v=1730462563&width=330",
+    3: "https://flow.audio/cdn/shop/files/3S-3ZFrontStraightAudioflow.jpg?v=1730584842&width=330",
+    4: "https://flow.audio/cdn/shop/files/3S-4ZFrontStraightAudioflow.jpg?v=1730585084&width=330",
+}
+
 
 async def _health_server(transport: MqttTransport, devices: dict, execute, refresh_state) -> None:
     async def handle(reader, writer):
@@ -75,58 +84,81 @@ async def _handle_toggle(body: str, devices: dict, execute, refresh_state) -> No
 
 
 def _status_page(connected: bool, devices: dict) -> bytes:
-    rows = []
-    for device in devices.values():
-        rows.append(
-            f"<tr><td colspan='3'><strong>{device.info.name}</strong> "
-            f"<small>{device.info.model} · {device.info.serial}</small> "
-            f"<span style='color:{'#2ecc71' if device.health.online else '#e74c3c'}'>{'online' if device.health.online else 'offline'}</span></td></tr>"
-        )
-        for zone in device.zones:
-            toggle = (
-                f"<form method='post' action='toggle'>"
-                f"<input type='hidden' name='serial' value='{device.info.serial}'>"
-                f"<input type='hidden' name='zone' value='{zone.number}'>"
-                f"<label class='switch'><input type='checkbox' onchange='this.form.submit()' "
-                f"{'checked' if zone.state == 'on' else ''} {'disabled' if not zone.enabled else ''}>"
-                f"<span class='slider'></span></label></form>"
-            )
-            rows.append(
-                f"<tr><td style='padding-left:1.5rem'>Zone {zone.number}</td>"
-                f"<td>{zone.name}{'' if zone.enabled else ' <small>(disabled)</small>'}</td>"
-                f"<td>{toggle}</td></tr>"
-            )
-    table = (
-        "<table><thead><tr><th>Zone</th><th>Name</th><th>State</th></tr></thead><tbody>"
-        + "".join(rows)
-        + "</tbody></table>"
-        if rows else "<p>No devices discovered yet.</p>"
-    )
+    cards = "".join(_device_card(device) for device in devices.values())
+    body = cards if cards else "<p class='empty'>No devices discovered yet.</p>"
     html = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="{POLL_STATE_SECONDS}">
 <title>Audioflow2MQTT</title>
 <style>
-  body{{font-family:sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem;color:#333}}
+  :root{{--bg:#f5f5f7;--fg:#1a1a1a;--card:#fff;--border:#e2e2e5;--muted:#888;--on:#2ecc71;--off:#e74c3c}}
+  @media (prefers-color-scheme: dark){{
+    :root{{--bg:#17181a;--fg:#eee;--card:#232427;--border:#34353a;--muted:#9a9a9e}}
+  }}
+  body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    max-width:720px;margin:2rem auto;padding:0 1rem;color:var(--fg);background:var(--bg)}}
   h1{{font-size:1.4rem;margin-bottom:.25rem}}
   .badge{{display:inline-block;padding:.2rem .6rem;border-radius:.25rem;color:#fff;font-size:.85rem}}
-  table{{width:100%;border-collapse:collapse;margin-top:1.5rem}}
-  th{{text-align:left;border-bottom:2px solid #ddd;padding:.4rem .5rem}}
-  td{{padding:.35rem .5rem;border-bottom:1px solid #eee}}
-  .switch{{position:relative;display:inline-block;width:2.6rem;height:1.5rem}}
+  .empty{{color:var(--muted)}}
+  .device{{background:var(--card);border:1px solid var(--border);border-radius:.6rem;margin-top:1.2rem;overflow:hidden}}
+  .device-header{{display:flex;align-items:center;gap:.7rem;padding:.7rem 1rem;border-bottom:1px solid var(--border)}}
+  .device-header strong{{font-size:1.05rem}}
+  .device-header small{{color:var(--muted)}}
+  .device-header .text{{display:flex;flex-wrap:wrap;align-items:baseline;gap:.5rem;flex:1}}
+  .device-photo{{width:2.6rem;height:2.6rem;object-fit:contain;border-radius:.35rem;background:var(--bg);flex:none}}
+  .zone{{display:flex;align-items:center;gap:.6rem;padding:.55rem 1rem;border-bottom:1px solid var(--border)}}
+  .zone:last-child{{border-bottom:none}}
+  .dot{{width:.55rem;height:.55rem;border-radius:50%;background:var(--muted);flex:none}}
+  .dot.on{{background:var(--on)}}
+  .zone-name{{flex:1}}
+  .zone-name small{{color:var(--muted)}}
+  form{{margin:0}}
+  .switch{{position:relative;display:inline-block;width:2.6rem;height:1.5rem;flex:none}}
   .switch input{{opacity:0;width:0;height:0}}
-  .slider{{position:absolute;inset:0;background:#ccc;border-radius:1.5rem;transition:.15s;cursor:pointer}}
+  .slider{{position:absolute;inset:0;background:var(--border);border-radius:1.5rem;transition:.15s;cursor:pointer}}
   .slider::before{{content:"";position:absolute;width:1.1rem;height:1.1rem;left:.2rem;bottom:.2rem;background:#fff;border-radius:50%;transition:.15s}}
-  input:checked + .slider{{background:#2ecc71}}
+  input:checked + .slider{{background:var(--on)}}
   input:checked + .slider::before{{transform:translateX(1.1rem)}}
   input:disabled + .slider{{opacity:.4;cursor:not-allowed}}
 </style>
 </head><body>
 <h1>Audioflow2MQTT</h1>
-<span class="badge" style="background:{'#2ecc71' if connected else '#e74c3c'}">MQTT {'Connected' if connected else 'Disconnected'}</span>
-{table}
+<span class="badge" style="background:{'var(--on)' if connected else 'var(--off)'}">MQTT {'Connected' if connected else 'Disconnected'}</span>
+{body}
 </body></html>"""
     return html.encode()
+
+
+def _device_card(device) -> str:
+    zones = "".join(_zone_row(device.info.serial, zone) for zone in device.zones)
+    status_colour = "var(--on)" if device.health.online else "var(--off)"
+    status_text = "online" if device.health.online else "offline"
+    photo_url = MODEL_PHOTOS.get(len(device.zones))
+    photo = f"<img class='device-photo' src='{photo_url}' alt=''>" if photo_url else ""
+    return (
+        "<div class='device'>"
+        f"<div class='device-header'>{photo}<div class='text'><strong>{device.info.name}</strong>"
+        f"<small>{device.info.model} · {device.info.serial}</small></div>"
+        f"<span style='color:{status_colour}'>{status_text}</span></div>"
+        f"{zones}</div>"
+    )
+
+
+def _zone_row(serial: str, zone) -> str:
+    disabled_note = "" if zone.enabled else " <small>(disabled)</small>"
+    return (
+        "<div class='zone'>"
+        f"<span class='dot {'on' if zone.state == 'on' else ''}'></span>"
+        f"<span class='zone-name'>{zone.name}{disabled_note}</span>"
+        f"<form method='post' action='toggle'>"
+        f"<input type='hidden' name='serial' value='{serial}'>"
+        f"<input type='hidden' name='zone' value='{zone.number}'>"
+        f"<label class='switch'><input type='checkbox' onchange='this.form.submit()' "
+        f"{'checked' if zone.state == 'on' else ''} {'disabled' if not zone.enabled else ''}>"
+        f"<span class='slider'></span></label></form>"
+        "</div>"
+    )
 
 
 async def _poll(devices, interval: int, refresh) -> None:
