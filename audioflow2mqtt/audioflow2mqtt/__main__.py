@@ -112,7 +112,7 @@ def _status_page(connected: bool, devices: dict) -> bytes:
   .device-header strong{{font-size:1.05rem}}
   .device-header small{{color:var(--muted)}}
   .device-header .text{{display:flex;flex-wrap:wrap;align-items:baseline;gap:.5rem;flex:1}}
-  .device-photo{{width:2.8rem;height:2.8rem;object-fit:contain;flex:none}}
+  .device-photo{{width:4.6rem;height:1.5rem;object-fit:contain;flex:none}}
   .zone{{display:flex;align-items:center;gap:.6rem;padding:.55rem 1rem;border-bottom:1px solid var(--border)}}
   .zone:last-child{{border-bottom:none}}
   .dot{{width:.55rem;height:.55rem;border-radius:50%;background:var(--muted);flex:none}}
