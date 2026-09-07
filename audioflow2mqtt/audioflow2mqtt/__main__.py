@@ -11,6 +11,7 @@ import logging
 import os
 import signal
 import sys
+from pathlib import Path
 from urllib.parse import parse_qs
 
 import httpx
@@ -28,12 +29,11 @@ HEALTH_PORT = 8099
 
 # Product photos keyed by zone count, for the status page — Audioflow's device
 # lineup differs by zone count (2Z/3Z/4Z), not by the model string the device
-# itself reports (whose exact format isn't documented).
-MODEL_PHOTOS = {
-    2: "https://flow.audio/cdn/shop/files/3S-2ZFrontStraightAudioflow.jpg?v=1730462563&width=330",
-    3: "https://flow.audio/cdn/shop/files/3S-3ZFrontStraightAudioflow.jpg?v=1730584842&width=330",
-    4: "https://flow.audio/cdn/shop/files/3S-4ZFrontStraightAudioflow.jpg?v=1730585084&width=330",
-}
+# itself reports (whose exact format isn't documented). Bundled locally rather
+# than hotlinked so the page doesn't depend on flow.audio's CDN URLs staying stable.
+MODEL_PHOTOS = {2: "2z.png", 3: "3z.png", 4: "4z.png"}
+_PHOTOS_DIR = Path(__file__).parent / "photos"
+_PHOTO_BYTES = {name: (_PHOTOS_DIR / name).read_bytes() for name in set(MODEL_PHOTOS.values())}
 
 
 async def _health_server(transport: MqttTransport, devices: dict, execute, refresh_state) -> None:
@@ -52,6 +52,12 @@ async def _health_server(transport: MqttTransport, devices: dict, execute, refre
             writer.write(b"HTTP/1.1 " + (b"200 OK" if ok else b"503 Service Unavailable") + b"\r\nContent-Type: text/plain\r\n\r\n" + (b"OK" if ok else b"Service Unavailable"))
         elif peer != "172.30.32.2":
             writer.write(b"HTTP/1.1 403 Forbidden\r\n\r\n")
+        elif path.startswith("/photos/"):
+            photo = _PHOTO_BYTES.get(path.removeprefix("/photos/"))
+            if photo is None:
+                writer.write(b"HTTP/1.1 404 Not Found\r\n\r\n")
+            else:
+                writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nCache-Control: max-age=86400\r\n\r\n" + photo)
         elif method == "POST" and path == "/toggle":
             await _handle_toggle(body.decode(), devices, execute, refresh_state)
             # Relative redirect: Home Assistant's ingress proxy forwards requests to
@@ -106,7 +112,7 @@ def _status_page(connected: bool, devices: dict) -> bytes:
   .device-header strong{{font-size:1.05rem}}
   .device-header small{{color:var(--muted)}}
   .device-header .text{{display:flex;flex-wrap:wrap;align-items:baseline;gap:.5rem;flex:1}}
-  .device-photo{{width:2.6rem;height:2.6rem;object-fit:contain;border-radius:.35rem;background:var(--bg);flex:none}}
+  .device-photo{{width:2.8rem;height:2.8rem;object-fit:contain;flex:none}}
   .zone{{display:flex;align-items:center;gap:.6rem;padding:.55rem 1rem;border-bottom:1px solid var(--border)}}
   .zone:last-child{{border-bottom:none}}
   .dot{{width:.55rem;height:.55rem;border-radius:50%;background:var(--muted);flex:none}}
@@ -134,8 +140,8 @@ def _device_card(device) -> str:
     zones = "".join(_zone_row(device.info.serial, zone) for zone in device.zones)
     status_colour = "var(--on)" if device.health.online else "var(--off)"
     status_text = "online" if device.health.online else "offline"
-    photo_url = MODEL_PHOTOS.get(len(device.zones))
-    photo = f"<img class='device-photo' src='{photo_url}' alt=''>" if photo_url else ""
+    photo_name = MODEL_PHOTOS.get(len(device.zones))
+    photo = f"<img class='device-photo' src='photos/{photo_name}' alt=''>" if photo_name else ""
     return (
         "<div class='device'>"
         f"<div class='device-header'>{photo}<div class='text'><strong>{device.info.name}</strong>"
