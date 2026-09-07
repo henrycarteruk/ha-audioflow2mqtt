@@ -11,12 +11,14 @@ import logging
 import os
 import signal
 import sys
+from urllib.parse import parse_qs
 
 import httpx
 
 from .app import Device, Orchestrator
 from .config import fetch_mqtt_service, resolve_config
 from .discovery import discover_devices
+from .dispatch import ApplyZoneState
 from .mqtt_transport import MqttTransport
 
 POLL_STATE_SECONDS = 10
@@ -25,23 +27,51 @@ DISCOVERY_RETRY_SECONDS = 60
 HEALTH_PORT = 8099
 
 
-async def _health_server(transport: MqttTransport, devices: dict) -> None:
+async def _health_server(transport: MqttTransport, devices: dict, execute, refresh_state) -> None:
     async def handle(reader, writer):
-        raw = await reader.read(1024)
-        path = raw.split(b" ")[1].split(b"?")[0] if b" " in raw else b"/"
+        method, _, request = (await reader.readline()).decode().partition(" ")
+        path = request.split(" ")[0].split("?")[0]
+        headers = {}
+        while (line := (await reader.readline()).strip()):
+            key, _, value = line.decode().partition(":")
+            headers[key.strip().lower()] = value.strip()
+        body = await reader.read(int(headers.get("content-length", 0)))
         peer = writer.get_extra_info("peername")[0]
-        if path == b"/health":
+
+        if path == "/health":
             ok = transport.connected
             writer.write(b"HTTP/1.1 " + (b"200 OK" if ok else b"503 Service Unavailable") + b"\r\nContent-Type: text/plain\r\n\r\n" + (b"OK" if ok else b"Service Unavailable"))
-        elif peer == "172.30.32.2":
-            writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + _status_page(transport.connected, devices))
-        else:
+        elif peer != "172.30.32.2":
             writer.write(b"HTTP/1.1 403 Forbidden\r\n\r\n")
+        elif method == "POST" and path == "/toggle":
+            await _handle_toggle(body.decode(), devices, execute, refresh_state)
+            # Relative redirect: Home Assistant's ingress proxy forwards requests to
+            # the add-on with the per-session path prefix already stripped, so an
+            # absolute "/" would send the browser to HA's own root instead of back
+            # through the proxy. "./" resolves against the request URL and stays
+            # under the ingress prefix.
+            writer.write(b"HTTP/1.1 303 See Other\r\nLocation: ./\r\n\r\n")
+        else:
+            writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + _status_page(transport.connected, devices))
         await writer.drain()
         writer.close()
     server = await asyncio.start_server(handle, "0.0.0.0", HEALTH_PORT)
     async with server:
         await server.serve_forever()
+
+
+async def _handle_toggle(body: str, devices: dict, execute, refresh_state) -> None:
+    fields = parse_qs(body)
+    serial = fields.get("serial", [None])[0]
+    zone_number = int(fields.get("zone", [0])[0] or 0)
+    device = devices.get(serial)
+    if device is None:
+        return
+    zone = next((z for z in device.zones if z.number == zone_number), None)
+    if zone is None or not zone.enabled:
+        return
+    await execute(ApplyZoneState(serial=serial, zone=zone_number, on=zone.state != "on"))
+    await refresh_state(serial)
 
 
 def _status_page(connected: bool, devices: dict) -> bytes:
@@ -53,10 +83,18 @@ def _status_page(connected: bool, devices: dict) -> bytes:
             f"<span style='color:{'#2ecc71' if device.health.online else '#e74c3c'}'>{'online' if device.health.online else 'offline'}</span></td></tr>"
         )
         for zone in device.zones:
+            toggle = (
+                f"<form method='post' action='toggle'>"
+                f"<input type='hidden' name='serial' value='{device.info.serial}'>"
+                f"<input type='hidden' name='zone' value='{zone.number}'>"
+                f"<label class='switch'><input type='checkbox' onchange='this.form.submit()' "
+                f"{'checked' if zone.state == 'on' else ''} {'disabled' if not zone.enabled else ''}>"
+                f"<span class='slider'></span></label></form>"
+            )
             rows.append(
                 f"<tr><td style='padding-left:1.5rem'>Zone {zone.number}</td>"
                 f"<td>{zone.name}{'' if zone.enabled else ' <small>(disabled)</small>'}</td>"
-                f"<td style='color:{'#2ecc71' if zone.state == 'on' else '#aaa'}'>{zone.state}</td></tr>"
+                f"<td>{toggle}</td></tr>"
             )
     table = (
         "<table><thead><tr><th>Zone</th><th>Name</th><th>State</th></tr></thead><tbody>"
@@ -75,6 +113,13 @@ def _status_page(connected: bool, devices: dict) -> bytes:
   table{{width:100%;border-collapse:collapse;margin-top:1.5rem}}
   th{{text-align:left;border-bottom:2px solid #ddd;padding:.4rem .5rem}}
   td{{padding:.35rem .5rem;border-bottom:1px solid #eee}}
+  .switch{{position:relative;display:inline-block;width:2.6rem;height:1.5rem}}
+  .switch input{{opacity:0;width:0;height:0}}
+  .slider{{position:absolute;inset:0;background:#ccc;border-radius:1.5rem;transition:.15s;cursor:pointer}}
+  .slider::before{{content:"";position:absolute;width:1.1rem;height:1.1rem;left:.2rem;bottom:.2rem;background:#fff;border-radius:50%;transition:.15s}}
+  input:checked + .slider{{background:#2ecc71}}
+  input:checked + .slider::before{{transform:translateX(1.1rem)}}
+  input:disabled + .slider{{opacity:.4;cursor:not-allowed}}
 </style>
 </head><body>
 <h1>Audioflow2MQTT</h1>
@@ -140,7 +185,7 @@ async def run() -> None:
             asyncio.create_task(_poll(devices, POLL_STATE_SECONDS, orchestrator.refresh_state)),
             asyncio.create_task(_poll(devices, POLL_NETWORK_SECONDS, orchestrator.refresh_network)),
             asyncio.create_task(_retry()),
-            asyncio.create_task(_health_server(transport, devices)),
+            asyncio.create_task(_health_server(transport, devices, orchestrator.execute, orchestrator.refresh_state)),
         ]
         try:
             await transport.run_forever(orchestrator.handle_message, on_connect=on_connect)
