@@ -38,6 +38,11 @@ async def _health_server(transport: MqttTransport, devices: dict, execute, refre
         body = await reader.read(int(headers.get("content-length", 0)))
         peer = writer.get_extra_info("peername")[0]
 
+        # Home Assistant proxies ingress under a per-session path prefix and tells
+        # the add-on via this header; links/forms in the page must be prefixed with
+        # it, or the browser sends follow-up requests to HA's own root (404).
+        ingress_path = headers.get("x-ingress-path", "")
+
         if path == "/health":
             ok = transport.connected
             writer.write(b"HTTP/1.1 " + (b"200 OK" if ok else b"503 Service Unavailable") + b"\r\nContent-Type: text/plain\r\n\r\n" + (b"OK" if ok else b"Service Unavailable"))
@@ -45,9 +50,9 @@ async def _health_server(transport: MqttTransport, devices: dict, execute, refre
             writer.write(b"HTTP/1.1 403 Forbidden\r\n\r\n")
         elif method == "POST" and path == "/toggle":
             await _handle_toggle(body.decode(), devices, execute, refresh_state)
-            writer.write(b"HTTP/1.1 303 See Other\r\nLocation: /\r\n\r\n")
+            writer.write(b"HTTP/1.1 303 See Other\r\nLocation: " + (ingress_path + "/").encode() + b"\r\n\r\n")
         else:
-            writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + _status_page(transport.connected, devices))
+            writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + _status_page(transport.connected, devices, ingress_path))
         await writer.drain()
         writer.close()
     server = await asyncio.start_server(handle, "0.0.0.0", HEALTH_PORT)
@@ -69,7 +74,7 @@ async def _handle_toggle(body: str, devices: dict, execute, refresh_state) -> No
     await refresh_state(serial)
 
 
-def _status_page(connected: bool, devices: dict) -> bytes:
+def _status_page(connected: bool, devices: dict, ingress_path: str = "") -> bytes:
     rows = []
     for device in devices.values():
         rows.append(
@@ -79,7 +84,7 @@ def _status_page(connected: bool, devices: dict) -> bytes:
         )
         for zone in device.zones:
             toggle = (
-                f"<form method='post' action='/toggle'>"
+                f"<form method='post' action='{ingress_path}/toggle'>"
                 f"<input type='hidden' name='serial' value='{device.info.serial}'>"
                 f"<input type='hidden' name='zone' value='{zone.number}'>"
                 f"<label class='switch'><input type='checkbox' onchange='this.form.submit()' "
